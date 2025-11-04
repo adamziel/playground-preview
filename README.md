@@ -63,7 +63,7 @@ Supplying any of `plugin-path`, `theme-path`, or `wp-content-path` generates a d
 - Copies the referenced directory (within the extracted archive) into the appropriate location inside the Playground filesystem.
 - Activates the plugin/theme via `wp-cli` if applicable.
 
-Provide multiple paths to combine behaviours (for example, copy a plugin and a theme in one blueprint).
+Provide multiple paths to combine behaviours (for example, copy a plugin and a theme in one blueprint). If you set `plugin-path: .` within a repo that is itself a plugin, the entire repository root is copied into `/wp-content/plugins/{{REPO_SLUG}}` before activation.
 
 If you pass a `blueprint` input, the shortcuts are ignored and the provided JSON is used after interpolation.
 
@@ -85,6 +85,7 @@ Placeholders resolve inside both the blueprint and the templates (case-insensiti
 | `{{REPO_FULL_NAME}}` | `<owner>/<repo>` concatenated. |
 | `{{REPO_ARCHIVE_URL}}` | Codeload URL pointing to the pull request branch archive. |
 | `{{REPO_ARCHIVE_ROOT}}` | Archive root folder name (as used within the downloaded ZIP). |
+| `{{REPO_SLUG}}` | Sanitised repository slug (lowercase alphanumeric + hyphen). |
 | `{{PLUGIN_PATH}}`, `{{THEME_PATH}}`, `{{WP_CONTENT_PATH}}` | Paths supplied through the shortcut inputs. |
 | `{{PLUGIN_SLUG}}`, `{{THEME_SLUG}}` | Slugified directory name derived from the provided path. |
 | `{{PLAYGROUND_HOST}}` | Sanitised Playground host. |
