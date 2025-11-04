@@ -93,6 +93,7 @@ Placeholders resolve inside both the blueprint and the templates (case-insensiti
 | `{{PLAYGROUND_BLUEPRINT_JSON}}` | The final JSON blueprint (post-substitution). |
 | `{{PLAYGROUND_BLUEPRINT_DATA_URL}}` | `data:application/json,…` URL that is appended to the Playground link. |
 | `{{PLAYGROUND_BUTTON}}` / `{{PLAYGROUND_BUTTON_HTML}}` | The rendered graphical button HTML. |
+| `{{PLAYGROUND_BUTTON_IMAGE_URL}}` | Default button image hosted in this repository (override via `template-variables`). |
 
 Add custom tokens by passing JSON via `blueprint-variables` or `template-variables`. Keys are uppercased automatically, so `{"sitePath":"/var/www"}` becomes available as `{{SITEPATH}}`.
 
@@ -103,6 +104,8 @@ Add custom tokens by passing JSON via `blueprint-variables` or `template-variabl
 - **Description mode** uses a button-first block anchored between the configured start/end markers. Removing the block from the PR body is fine—the next workflow run reinstates it.
 - **Comment mode** posts a comment that begins with the configured `comment-identifier`. If someone deletes the comment, a subsequent run recreates it.
 
+The default button is an `<img>` hosted in this repository (`assets/playground-preview-button.svg`) wrapped in a link that opens the Playground preview in a new tab.
+
 To switch from the default graphical button to a simple link, override the template, for example:
 
 ```yaml
@@ -111,6 +114,8 @@ with:
   comment-template: |
     🔗 [Open playground preview]({{PLAYGROUND_URL}})
     _(applies to branch {{PR_HEAD_REF}})_
+
+You can also override the button artwork without changing the template by supplying `template-variables: '{"PLAYGROUND_BUTTON_IMAGE_URL":"https://example.com/button.svg"}'`.
 ```
 
 ---

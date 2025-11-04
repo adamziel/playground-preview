@@ -310,12 +310,11 @@ jobs:
             const previewUrl = `${playgroundHost}${playgroundHost.includes('?') ? '&' : '?'}blueprint-url=${blueprintDataUrl}`;
 
             const joinWithNewline = (segments) => segments.join('\n');
+            const defaultButtonImageUrl = 'https://raw.githubusercontent.com/Automattic/preview-button/main/assets/playground-preview-button.svg';
 
             const defaultButtonTemplate = joinWithNewline([
-              '<a href="{{PLAYGROUND_URL}}" target="_blank" rel="noopener noreferrer"',
-              '   style="display:inline-flex;align-items:center;gap:12px;padding:14px 18px;border-radius:999px;background:#3858e9;color:#fff;text-decoration:none;font-weight:600;',
-              "          font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;\">",
-              '  <span style="font-size:16px;">Open WordPress Playground Preview</span>',
+              '<a href="{{PLAYGROUND_URL}}" target="_blank" rel="noopener noreferrer">',
+              '  <img src="{{PLAYGROUND_BUTTON_IMAGE_URL}}" alt="Open WordPress Playground Preview" width="320" height="68" />',
               '</a>'
             ]);
 
@@ -342,6 +341,7 @@ jobs:
                 PLAYGROUND_URL: previewUrl,
                 PLAYGROUND_BLUEPRINT_JSON: substitutedBlueprint,
                 PLAYGROUND_BLUEPRINT_DATA_URL: blueprintDataUrl,
+                PLAYGROUND_BUTTON_IMAGE_URL: defaultButtonImageUrl,
                 PLAYGROUND_BUTTON_HTML: defaultButtonTemplate,
                 PLAYGROUND_BUTTON: substitute(defaultButtonTemplate, {})
               },
@@ -364,7 +364,9 @@ jobs:
 
             const performDescriptionUpdate = async () => {
               const currentBody = pr.body || '';
-              const managedBlock = `${descriptionMarkerStart}\\n${renderedDescription.trim()}\\n${descriptionMarkerEnd}`;
+              const managedBlock = `${descriptionMarkerStart}
+${renderedDescription.trim()}
+${descriptionMarkerEnd}`;
               let nextBody;
 
               if (currentBody.includes(descriptionMarkerStart) && currentBody.includes(descriptionMarkerEnd)) {
@@ -375,7 +377,9 @@ jobs:
                 nextBody = currentBody.replace(pattern, managedBlock);
               } else {
                 const trimmed = currentBody.trimEnd();
-                nextBody = trimmed ? `${trimmed}\\n\\n${managedBlock}` : managedBlock;
+                nextBody = trimmed ? `${trimmed}
+
+${managedBlock}` : managedBlock;
               }
 
               if (nextBody !== currentBody) {
@@ -392,7 +396,8 @@ jobs:
             };
 
             const performCommentUpdate = async () => {
-              const managedBody = `${commentIdentifier}\\n${renderedComment.trim()}`;
+              const managedBody = `${commentIdentifier}
+${renderedComment.trim()}`;
               const comments = await github.paginate(github.rest.issues.listComments, {
                 owner,
                 repo: repoName,
