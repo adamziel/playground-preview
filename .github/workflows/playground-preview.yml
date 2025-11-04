@@ -1,0 +1,422 @@
+name: WordPress Playground Preview
+
+on:
+  workflow_call:
+    inputs:
+      preview-mode:
+        type: string
+        description: >
+          How to publish the preview button. Accepted values: description (default) or comment.
+          Description mode updates the PR body, comment mode manages a PR comment.
+        default: description
+      playground-host:
+        type: string
+        description: Base Playground host URL used to build the preview link.
+        default: https://playground.wordpress.net
+      blueprint:
+        type: string
+        description: >
+          Inline JSON blueprint template. Supports {{PLACEHOLDER}} variables (see docs). Overrides auto-generated blueprint.
+      plugin-path:
+        type: string
+        description: >
+          Path to a plugin inside the repository to install & activate in Playground (relative to repo root).
+      theme-path:
+        type: string
+        description: >
+          Path to a theme inside the repository to install & activate in Playground (relative to repo root).
+      wp-content-path:
+        type: string
+        description: >
+          Path to a wp-content directory inside the repository to import into Playground (relative to repo root).
+      blueprint-variables:
+        type: string
+        description: >
+          Additional JSON object with values to interpolate into the blueprint template.
+        default: "{}"
+      template-variables:
+        type: string
+        description: >
+          Additional JSON object with values to interpolate into the content templates.
+        default: "{}"
+      description-template:
+        type: string
+        description: >
+          Custom markdown/HTML template used in description mode. Supports {{PLACEHOLDER}} variables.
+      comment-template:
+        type: string
+        description: >
+          Custom markdown/HTML template used in comment mode. Supports {{PLACEHOLDER}} variables.
+      description-marker-start:
+        type: string
+        description: Unique HTML comment marking the beginning of the managed PR body block.
+        default: "<!-- wp-playground-preview:start -->"
+      description-marker-end:
+        type: string
+        description: Unique HTML comment marking the end of the managed PR body block.
+        default: "<!-- wp-playground-preview:end -->"
+      comment-identifier:
+        type: string
+        description: Unique marker embedded in the PR comment so the workflow can find & update it.
+        default: "<!-- wp-playground-preview-comment -->"
+    secrets:
+      github-token:
+        description: >
+          Optional fine-grained token. Defaults to the caller workflow's GITHUB_TOKEN when omitted.
+        required: false
+
+jobs:
+  build-preview:
+    name: Build Playground Preview
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure repository context
+        if: ${{ !github.event.pull_request }}
+        run: |
+          echo "This reusable workflow must be invoked from a pull_request triggered workflow."
+          exit 1
+
+      - name: Prepare preview content
+        id: preview
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.github-token != '' && secrets.github-token || github.token }}
+          result-encoding: string
+          script: |
+            const modeInput = (core.getInput('preview-mode') || 'description').trim().toLowerCase();
+            const mode = modeInput === 'comment' ? 'comment' : 'description';
+
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              throw new Error('This workflow must run on a pull_request event payload.');
+            }
+
+            const repo = context.payload.repository;
+            const owner = repo.owner.login || repo.owner.name || repo.owner.id;
+            const repoName = repo.name;
+            const repoFullName = repo.full_name;
+            const prNumber = pr.number;
+            const prTitle = pr.title;
+            const headRef = pr.head.ref;
+            const headSha = pr.head.sha;
+            const baseRef = pr.base.ref;
+
+            const playgroundHostRaw = core.getInput('playground-host') || 'https://playground.wordpress.net';
+            const playgroundHost = playgroundHostRaw.replace(/\/+$/, '');
+
+            const pluginPath = (core.getInput('plugin-path') || '').trim();
+            const themePath = (core.getInput('theme-path') || '').trim();
+            const wpContentPath = (core.getInput('wp-content-path') || '').trim();
+
+            const blueprintTemplateInput = core.getInput('blueprint');
+            const blueprintVarsInput = core.getInput('blueprint-variables') || '{}';
+            const templateVarsInput = core.getInput('template-variables') || '{}';
+            const descriptionTemplateInput = core.getInput('description-template');
+            const commentTemplateInput = core.getInput('comment-template');
+            const descriptionMarkerStart = core.getInput('description-marker-start') || '<!-- wp-playground-preview:start -->';
+            const descriptionMarkerEnd = core.getInput('description-marker-end') || '<!-- wp-playground-preview:end -->';
+            const commentIdentifier = core.getInput('comment-identifier') || '<!-- wp-playground-preview-comment -->';
+
+            const safeParseJson = (label, value, fallback = {}) => {
+              if (!value || !value.trim()) {
+                return fallback;
+              }
+              try {
+                return JSON.parse(value);
+              } catch (error) {
+                throw new Error(`Unable to parse ${label} as JSON. ${error.message}`);
+              }
+            };
+
+            const extraBlueprintVars = safeParseJson('blueprint-variables', blueprintVarsInput);
+            const extraTemplateVars = safeParseJson('template-variables', templateVarsInput);
+
+            const archiveBranchSegment = headRef.replace(/[^0-9A-Za-z]/g, '-');
+            const repoArchiveRoot = `${repoName}-${archiveBranchSegment}`;
+            const repoZipUrl = `https://codeload.github.com/${repoFullName}/zip/refs/heads/${encodeURIComponent(headRef)}`;
+
+            const normalizePath = (path) => path.replace(/^\/+/, '');
+            const inferSlug = (path, fallback) => {
+              const clean = normalizePath(path).split('/').filter(Boolean).pop();
+              if (!clean) return fallback;
+              return clean.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+            };
+
+            const pluginSlug = pluginPath ? inferSlug(pluginPath, 'plugin-under-review') : '';
+            const themeSlug = themePath ? inferSlug(themePath, 'theme-under-review') : '';
+
+            const buildAutoBlueprint = () => {
+              const steps = [];
+
+              const needsArchive = Boolean(pluginPath || themePath || wpContentPath);
+              if (needsArchive) {
+                steps.push({
+                  step: 'importRemoteZip',
+                  url: repoZipUrl,
+                  path: '/tmp/repository.zip'
+                });
+              }
+
+              if (pluginPath) {
+                steps.push(
+                  {
+                    step: 'copyFromZip',
+                    zipFile: '/tmp/repository.zip',
+                    source: `${repoArchiveRoot}/${normalizePath(pluginPath)}`,
+                    destination: `/wp-content/plugins/${pluginSlug}`
+                  },
+                  {
+                    step: 'wp-cli',
+                    command: `plugin activate ${pluginSlug}`
+                  }
+                );
+              }
+
+              if (themePath) {
+                steps.push(
+                  {
+                    step: 'copyFromZip',
+                    zipFile: '/tmp/repository.zip',
+                    source: `${repoArchiveRoot}/${normalizePath(themePath)}`,
+                    destination: `/wp-content/themes/${themeSlug}`
+                  },
+                  {
+                    step: 'wp-cli',
+                    command: `theme activate ${themeSlug}`
+                  }
+                );
+              }
+
+              if (wpContentPath) {
+                steps.push({
+                  step: 'copyFromZip',
+                  zipFile: '/tmp/repository.zip',
+                  source: `${repoArchiveRoot}/${normalizePath(wpContentPath)}`,
+                  destination: '/wp-content'
+                });
+              }
+
+              if (!steps.length) {
+                steps.push({
+                  step: 'wp-cli',
+                  command: 'plugin list'
+                });
+              }
+
+              return JSON.stringify(
+                {
+                  $schema: 'https://playground.wordpress.net/blueprint-schema.json',
+                  preferredVersions: {
+                    php: '8.2',
+                    wp: 'latest'
+                  },
+                  steps
+                },
+                null,
+                2
+              );
+            };
+
+            const rawBlueprintTemplate = blueprintTemplateInput && blueprintTemplateInput.trim().length
+              ? blueprintTemplateInput
+              : buildAutoBlueprint();
+
+            const baseBlueprintVars = {
+              PR_NUMBER: String(prNumber),
+              PR_TITLE: prTitle,
+              PR_HEAD_REF: headRef,
+              PR_HEAD_SHA: headSha,
+              PR_BASE_REF: baseRef,
+              REPO_OWNER: owner,
+              REPO_NAME: repoName,
+              REPO_FULL_NAME: repoFullName,
+              REPO_ARCHIVE_URL: repoZipUrl,
+              REPO_ARCHIVE_ROOT: repoArchiveRoot,
+              PLUGIN_PATH: pluginPath,
+              THEME_PATH: themePath,
+              WP_CONTENT_PATH: wpContentPath,
+              PLUGIN_SLUG: pluginSlug,
+              THEME_SLUG: themeSlug,
+              PLAYGROUND_HOST: playgroundHost
+            };
+
+            const mergeVariables = (...maps) => maps.reduce((acc, map) => {
+              Object.entries(map || {}).forEach(([key, value]) => {
+                if (value === undefined || value === null) {
+                  return;
+                }
+                acc[String(key).toUpperCase()] = typeof value === 'string' ? value : JSON.stringify(value);
+              });
+              return acc;
+            }, {});
+
+            const blueprintVariables = mergeVariables(baseBlueprintVars, extraBlueprintVars);
+
+            const substitute = (template, values) => {
+              if (!template) {
+                return '';
+              }
+              return template.replace(/\{\{\s*([A-Z0-9_]+)\s*\}\}/gi, (match, key) => {
+                const upperKey = key.toUpperCase();
+                return Object.prototype.hasOwnProperty.call(values, upperKey)
+                  ? values[upperKey]
+                  : '';
+              });
+            };
+
+            const substitutedBlueprint = substitute(rawBlueprintTemplate, blueprintVariables);
+
+            try {
+              JSON.parse(substitutedBlueprint);
+            } catch (error) {
+              core.warning(substitutedBlueprint);
+              throw new Error(`Resulting blueprint is not valid JSON. ${error.message}`);
+            }
+
+            const blueprintDataUrl = `data:application/json,${encodeURIComponent(substitutedBlueprint)}`;
+
+            const previewUrl = `${playgroundHost}${playgroundHost.includes('?') ? '&' : '?'}blueprint-url=${blueprintDataUrl}`;
+
+            const defaultButtonTemplate = [
+              '<a href="{{PLAYGROUND_URL}}" target="_blank" rel="noopener noreferrer"',
+              '   style="display:inline-flex;align-items:center;gap:12px;padding:14px 18px;border-radius:999px;background:#3858e9;color:#fff;text-decoration:none;font-weight:600;',
+              "          font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;\">",
+              '  <span style="font-size:16px;">Open WordPress Playground Preview</span>',
+              '</a>'
+            ].join('\\n');
+
+            const defaultDescriptionTemplate = [
+              '{{PLAYGROUND_BUTTON}}',
+              '',
+              '<sub>Preview generated for PR #{{PR_NUMBER}} ({{PR_HEAD_REF}})</sub>'
+            ].join('\\n');
+
+            const defaultCommentTemplate = [
+              '### WordPress Playground Preview',
+              '',
+              '{{PLAYGROUND_BUTTON}}',
+              '',
+              '- PR: #{{PR_NUMBER}} — {{PR_TITLE}}',
+              '- Branch: `{{PR_HEAD_REF}}`',
+              '',
+              '_This preview stays in sync with the pull request._'
+            ].join('\\n');
+
+            const templateVariables = mergeVariables(
+              baseBlueprintVars,
+              {
+                PLAYGROUND_URL: previewUrl,
+                PLAYGROUND_BLUEPRINT_JSON: substitutedBlueprint,
+                PLAYGROUND_BLUEPRINT_DATA_URL: blueprintDataUrl,
+                PLAYGROUND_BUTTON_HTML: defaultButtonTemplate,
+                PLAYGROUND_BUTTON: substitute(defaultButtonTemplate, {})
+              },
+              extraTemplateVars
+            );
+
+            const resolvedButton = substitute(defaultButtonTemplate, templateVariables);
+            templateVariables.PLAYGROUND_BUTTON = resolvedButton;
+            templateVariables.PLAYGROUND_BUTTON_HTML = resolvedButton;
+
+            const descriptionTemplate = descriptionTemplateInput && descriptionTemplateInput.trim().length
+              ? descriptionTemplateInput
+              : defaultDescriptionTemplate;
+            const commentTemplate = commentTemplateInput && commentTemplateInput.trim().length
+              ? commentTemplateInput
+              : defaultCommentTemplate;
+
+            const renderedDescription = substitute(descriptionTemplate, templateVariables);
+            const renderedComment = substitute(commentTemplate, templateVariables);
+
+            const performDescriptionUpdate = async () => {
+              const currentBody = pr.body || '';
+              const managedBlock = `${descriptionMarkerStart}\\n${renderedDescription.trim()}\\n${descriptionMarkerEnd}`;
+              let nextBody;
+
+              if (currentBody.includes(descriptionMarkerStart) && currentBody.includes(descriptionMarkerEnd)) {
+                const pattern = new RegExp(
+                  `${descriptionMarkerStart}[\\s\\S]*?${descriptionMarkerEnd}`,
+                  'm'
+                );
+                nextBody = currentBody.replace(pattern, managedBlock);
+              } else {
+                const trimmed = currentBody.trimEnd();
+                nextBody = trimmed ? `${trimmed}\\n\\n${managedBlock}` : managedBlock;
+              }
+
+              if (nextBody !== currentBody) {
+                await github.rest.pulls.update({
+                  owner,
+                  repo: repoName,
+                  pull_number: prNumber,
+                  body: nextBody
+                });
+                core.info('PR description updated with Playground preview button.');
+              } else {
+                core.info('PR description already up to date. No changes applied.');
+              }
+            };
+
+            const performCommentUpdate = async () => {
+              const managedBody = `${commentIdentifier}\\n${renderedComment.trim()}`;
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo: repoName,
+                issue_number: prNumber,
+                per_page: 100
+              });
+
+              const existing = comments.find((comment) =>
+                typeof comment.body === 'string' && comment.body.includes(commentIdentifier)
+              );
+
+              if (existing) {
+                if (existing.body !== managedBody) {
+                  await github.rest.issues.updateComment({
+                    owner,
+                    repo: repoName,
+                    comment_id: existing.id,
+                    body: managedBody
+                  });
+                  core.info(`Updated existing preview comment (id: ${existing.id}).`);
+                } else {
+                  core.info('Preview comment already up to date.');
+                }
+                return existing.id;
+              }
+
+              const created = await github.rest.issues.createComment({
+                owner,
+                repo: repoName,
+                issue_number: prNumber,
+                body: managedBody
+              });
+              core.info(`Posted new preview comment (id: ${created.data.id}).`);
+              return created.data.id;
+            };
+
+            let commentId = '';
+            if (mode === 'description') {
+              await performDescriptionUpdate();
+            } else {
+              commentId = String(await performCommentUpdate() || '');
+            }
+
+            core.setOutput('mode', mode);
+            core.setOutput('preview-url', previewUrl);
+            core.setOutput('blueprint-json', substitutedBlueprint);
+            core.setOutput('rendered-description', renderedDescription);
+            core.setOutput('rendered-comment', renderedComment);
+            core.setOutput('comment-id', commentId);
+
+    outputs:
+      preview-url: ${{ steps.preview.outputs.preview-url }}
+      blueprint-json: ${{ steps.preview.outputs.blueprint-json }}
+      rendered-description: ${{ steps.preview.outputs.rendered-description }}
+      rendered-comment: ${{ steps.preview.outputs.rendered-comment }}
+      mode: ${{ steps.preview.outputs.mode }}
+      comment-id: ${{ steps.preview.outputs.comment-id }}
