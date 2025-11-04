@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="68" viewBox="0 0 320 68" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="320" y1="0" y2="68" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3858E9"/>
+      <stop offset="1" stop-color="#1D2EE4"/>
+    </linearGradient>
+  </defs>
+  <rect x="0.5" y="0.5" width="319" height="67" rx="33.5" fill="url(#bg)"/>
+  <rect x="0.5" y="0.5" width="319" height="67" rx="33.5" stroke="#0D1CB4" stroke-opacity="0.35"/>
+  <g fill="#FFFFFF" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+    <text font-size="18" font-weight="700" letter-spacing="0.01em">
+      <tspan x="65" y="30">Open WordPress</tspan>
+    </text>
+    <text font-size="16" font-weight="500" letter-spacing="0.01em">
+      <tspan x="65" y="50">Playground Preview</tspan>
+    </text>
+  </g>
+  <g transform="translate(24 18)" fill="#FFFFFF">
+    <path d="M20.4 8.3a1.4 1.4 0 0 0-1.4-1.4h-1.9v-3a1.4 1.4 0 0 0-1.4-1.4H9.4a1.4 1.4 0 0 0-1.4 1.4v3H6.1a1.4 1.4 0 0 0-1.4 1.4V20a1.4 1.4 0 0 0 1.4 1.4h12.9A1.4 1.4 0 0 0 20.4 20V8.3ZM13 6.3h-1.8v-2h1.8v2Zm-5.2 0h1.8v-2h-1.8v2Zm0 1.5h10.6V9H7.8V7.8ZM7.8 11h10.6v8.3H7.8V11Z"/>
+    <circle cx="13.1" cy="15.2" r="2.2"/>
+  </g>
+</svg>
