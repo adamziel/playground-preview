@@ -101,7 +101,7 @@ jobs:
           github-token: ${{ secrets.github-token != '' && secrets.github-token || github.token }}
           result-encoding: string
           script: |
-            const modeInput = (core.getInput('preview-mode') || 'description').trim().toLowerCase();
+            const modeInput = (process.env.INPUT_PREVIEW_MODE || 'description').trim().toLowerCase();
             const mode = modeInput === 'comment' ? 'comment' : 'description';
 
             const pr = context.payload.pull_request;
@@ -119,21 +119,21 @@ jobs:
             const headSha = pr.head.sha;
             const baseRef = pr.base.ref;
 
-            const playgroundHostRaw = core.getInput('playground-host') || 'https://playground.wordpress.net';
+            const playgroundHostRaw = process.env.INPUT_PLAYGROUND_HOST || 'https://playground.wordpress.net';
             const playgroundHost = playgroundHostRaw.replace(/\/+$/, '');
 
-            const pluginPath = (core.getInput('plugin-path') || '').trim();
-            const themePath = (core.getInput('theme-path') || '').trim();
-            const wpContentPath = (core.getInput('wp-content-path') || '').trim();
+            const pluginPath = (process.env.INPUT_PLUGIN_PATH || '').trim();
+            const themePath = (process.env.INPUT_THEME_PATH || '').trim();
+            const wpContentPath = (process.env.INPUT_WP_CONTENT_PATH || '').trim();
 
-            const blueprintTemplateInput = core.getInput('blueprint');
-            const blueprintVarsInput = core.getInput('blueprint-variables') || '{}';
-            const templateVarsInput = core.getInput('template-variables') || '{}';
-            const descriptionTemplateInput = core.getInput('description-template');
-            const commentTemplateInput = core.getInput('comment-template');
-            const descriptionMarkerStart = core.getInput('description-marker-start') || '<!-- wp-playground-preview:start -->';
-            const descriptionMarkerEnd = core.getInput('description-marker-end') || '<!-- wp-playground-preview:end -->';
-            const commentIdentifier = core.getInput('comment-identifier') || '<!-- wp-playground-preview-comment -->';
+            const blueprintTemplateInput = process.env.INPUT_BLUEPRINT || '';
+            const blueprintVarsInput = process.env.INPUT_BLUEPRINT_VARIABLES || '{}';
+            const templateVarsInput = process.env.INPUT_TEMPLATE_VARIABLES || '{}';
+            const descriptionTemplateInput = process.env.INPUT_DESCRIPTION_TEMPLATE || '';
+            const commentTemplateInput = process.env.INPUT_COMMENT_TEMPLATE || '';
+            const descriptionMarkerStart = process.env.INPUT_DESCRIPTION_MARKER_START || '<!-- wp-playground-preview:start -->';
+            const descriptionMarkerEnd = process.env.INPUT_DESCRIPTION_MARKER_END || '<!-- wp-playground-preview:end -->';
+            const commentIdentifier = process.env.INPUT_COMMENT_IDENTIFIER || '<!-- wp-playground-preview-comment -->';
 
             const safeParseJson = (label, value, fallback = {}) => {
               if (!value || !value.trim()) {
