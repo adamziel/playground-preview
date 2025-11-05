@@ -328,7 +328,7 @@ jobs:
 
             const defaultButtonTemplate = joinWithNewline([
               '<a href="{{PLAYGROUND_URL}}" target="_blank" rel="noopener noreferrer">',
-              '  <img src="{{PLAYGROUND_BUTTON_IMAGE_URL}}" alt="Open WordPress Playground Preview" width="160" height="34" />',
+              '  <img src="{{PLAYGROUND_BUTTON_IMAGE_URL}}" alt="Open WordPress Playground Preview" width="240" height="51" />',
               '</a>'
             ]);
 
