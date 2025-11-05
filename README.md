@@ -102,7 +102,7 @@ Add custom tokens by passing JSON via `blueprint-variables` or `template-variabl
 ## Templates
 
 - **Description mode** uses a button-first block anchored between the configured start/end markers. Removing the block from the PR body is fine—the next workflow run reinstates it.
-- **Comment mode** posts a comment that begins with the configured `comment-identifier`. If someone deletes the comment, a subsequent run recreates it.
+- **Comment mode** posts a comment that begins with the configured `comment-identifier`. If someone deletes the comment, a subsequent run recreates it. Switching from description to comment mode automatically strips the managed block from the PR body.
 
 The default button is an `<img>` hosted in this repository (`assets/playground-preview-button.svg`) wrapped in a link that opens the Playground preview in a new tab.
 
