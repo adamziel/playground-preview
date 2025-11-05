@@ -364,9 +364,7 @@ jobs:
 
             const performDescriptionUpdate = async () => {
               const currentBody = pr.body || '';
-              const managedBlock = `${descriptionMarkerStart}
-${renderedDescription.trim()}
-${descriptionMarkerEnd}`;
+              const managedBlock = `${descriptionMarkerStart}${String.fromCodePoint(10)}${renderedDescription.trim()}${String.fromCodePoint(10)}${descriptionMarkerEnd}`;
               let nextBody;
 
               if (currentBody.includes(descriptionMarkerStart) && currentBody.includes(descriptionMarkerEnd)) {
@@ -377,9 +375,7 @@ ${descriptionMarkerEnd}`;
                 nextBody = currentBody.replace(pattern, managedBlock);
               } else {
                 const trimmed = currentBody.trimEnd();
-                nextBody = trimmed ? `${trimmed}
-
-${managedBlock}` : managedBlock;
+                nextBody = trimmed ? `${trimmed}${String.fromCodePoint(10)}${String.fromCodePoint(10)}${managedBlock}` : managedBlock;
               }
 
               if (nextBody !== currentBody) {
@@ -419,8 +415,7 @@ ${managedBlock}` : managedBlock;
             };
 
             const performCommentUpdate = async () => {
-              const managedBody = `${commentIdentifier}
-${renderedComment.trim()}`;
+              const managedBody = `${commentIdentifier}${String.fromCodePoint(10)}${renderedComment.trim()}`;
               const comments = await github.paginate(github.rest.issues.listComments, {
                 owner,
                 repo: repoName,
