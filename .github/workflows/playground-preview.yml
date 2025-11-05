@@ -83,6 +83,20 @@ jobs:
       - name: Prepare preview content
         id: preview
         uses: actions/github-script@v7
+        env:
+          INPUT_PREVIEW_MODE: ${{ inputs.preview-mode }}
+          INPUT_PLAYGROUND_HOST: ${{ inputs.playground-host }}
+          INPUT_BLUEPRINT: ${{ inputs.blueprint }}
+          INPUT_PLUGIN_PATH: ${{ inputs.plugin-path }}
+          INPUT_THEME_PATH: ${{ inputs.theme-path }}
+          INPUT_WP_CONTENT_PATH: ${{ inputs.wp-content-path }}
+          INPUT_BLUEPRINT_VARIABLES: ${{ inputs.blueprint-variables }}
+          INPUT_TEMPLATE_VARIABLES: ${{ inputs.template-variables }}
+          INPUT_DESCRIPTION_TEMPLATE: ${{ inputs.description-template }}
+          INPUT_COMMENT_TEMPLATE: ${{ inputs.comment-template }}
+          INPUT_DESCRIPTION_MARKER_START: ${{ inputs.description-marker-start }}
+          INPUT_DESCRIPTION_MARKER_END: ${{ inputs.description-marker-end }}
+          INPUT_COMMENT_IDENTIFIER: ${{ inputs.comment-identifier }}
         with:
           github-token: ${{ secrets.github-token != '' && secrets.github-token || github.token }}
           result-encoding: string
