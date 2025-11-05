@@ -3,12 +3,13 @@ name: WordPress Playground Preview
 on:
   workflow_call:
     inputs:
-      preview-mode:
+      mode:
         type: string
         description: >
-          How to publish the preview button. Accepted values: description (default) or comment.
-          Description mode updates the PR body, comment mode manages a PR comment.
-        default: comment
+          How to publish the preview button. Accepted values:
+            - append-to-description (default) – updates the PR description with a managed block containing the preview button.
+            - post-comment – posts a comment with the preview button.
+        default: append-to-description
       playground-host:
         type: string
         description: Base Playground host URL used to build the preview link.
@@ -16,7 +17,8 @@ on:
       blueprint:
         type: string
         description: >
-          Inline JSON blueprint (ready-made, not a template). Overrides auto-generated blueprint.
+          WordPress Blueprint JSON string to use for testing this pull request.
+          When provided, the `plugin-path` and `theme-path` inputs are ignored.
       plugin-path:
         type: string
         description: >
@@ -38,18 +40,12 @@ on:
         type: string
         description: >
           Custom markdown/HTML template used in comment mode. Supports {{PLACEHOLDER}} variables.
-      description-marker-start:
-        type: string
-        description: Unique HTML comment marking the beginning of the managed PR body block.
-        default: "<!-- wp-playground-preview:start -->"
-      description-marker-end:
-        type: string
-        description: Unique HTML comment marking the end of the managed PR body block.
-        default: "<!-- wp-playground-preview:end -->"
-      comment-identifier:
-        type: string
-        description: Unique marker embedded in the PR comment so the workflow can find & update it.
-        default: "<!-- wp-playground-preview-comment -->"
+      restore-button-if-removed:
+        type: boolean
+        description: |-
+          In description mode: when true, the button will be re-added if the PR author removes it.
+          When false, if the PR author removes the button markers, they stay removed.
+        default: true
     secrets:
       github-token:
         description: >
@@ -75,23 +71,22 @@ jobs:
         id: preview
         uses: actions/github-script@v7
         env:
-          INPUT_PREVIEW_MODE: ${{ inputs.preview-mode }}
+          INPUT_PREVIEW_MODE: ${{ inputs.mode }}
           INPUT_PLAYGROUND_HOST: ${{ inputs.playground-host }}
           INPUT_BLUEPRINT: ${{ inputs.blueprint }}
           INPUT_PLUGIN_PATH: ${{ inputs.plugin-path }}
           INPUT_THEME_PATH: ${{ inputs.theme-path }}
-          INPUT_TEMPLATE_VARIABLES: ${{ inputs.template-variables }}
           INPUT_DESCRIPTION_TEMPLATE: ${{ inputs.description-template }}
           INPUT_COMMENT_TEMPLATE: ${{ inputs.comment-template }}
-          INPUT_DESCRIPTION_MARKER_START: ${{ inputs.description-marker-start }}
-          INPUT_DESCRIPTION_MARKER_END: ${{ inputs.description-marker-end }}
-          INPUT_COMMENT_IDENTIFIER: ${{ inputs.comment-identifier }}
+          INPUT_RESTORE_BUTTON_IF_REMOVED: ${{ inputs.restore-button-if-removed }}
         with:
           github-token: ${{ secrets.github-token != '' && secrets.github-token || github.token }}
           result-encoding: string
           script: |
-            const modeInput = (process.env.INPUT_PREVIEW_MODE || 'description').trim().toLowerCase();
-            const mode = modeInput === 'comment' ? 'comment' : 'description';
+            const mode = (process.env.INPUT_PREVIEW_MODE || 'append-to-description').trim().toLowerCase();
+            if (mode !== 'append-to-description' && mode !== 'post-comment') {
+              throw new Error(`Invalid preview mode: ${mode}. Accepted values: append-to-description, post-comment.`);
+            }
 
             const pr = context.payload.pull_request;
             if (!pr) {
@@ -113,14 +108,18 @@ jobs:
 
             const pluginPath = (process.env.INPUT_PLUGIN_PATH || '').trim();
             const themePath = (process.env.INPUT_THEME_PATH || '').trim();
-
             const blueprintInput = process.env.INPUT_BLUEPRINT || '';
-            const templateVarsInput = process.env.INPUT_TEMPLATE_VARIABLES || '{}';
+
+            if(!pluginPath && !themePath && !blueprintInput) {
+              throw new Error('One of `plugin-path`, `theme-path`, or `blueprint` inputs is required.');
+            }
+
             const descriptionTemplateInput = process.env.INPUT_DESCRIPTION_TEMPLATE || '';
             const commentTemplateInput = process.env.INPUT_COMMENT_TEMPLATE || '';
-            const descriptionMarkerStart = process.env.INPUT_DESCRIPTION_MARKER_START || '<!-- wp-playground-preview:start -->';
-            const descriptionMarkerEnd = process.env.INPUT_DESCRIPTION_MARKER_END || '<!-- wp-playground-preview:end -->';
-            const commentIdentifier = process.env.INPUT_COMMENT_IDENTIFIER || '<!-- wp-playground-preview-comment -->';
+            const descriptionMarkerStart = '<!-- wp-playground-preview:start -->';
+            const descriptionMarkerEnd = '<!-- wp-playground-preview:end -->';
+            const commentIdentifier = '<!-- wp-playground-preview-comment -->';
+            const restoreButtonIfRemoved = process.env.INPUT_RESTORE_BUTTON_IF_REMOVED !== 'false';
 
             const safeParseJson = (label, value, fallback = {}) => {
               if (!value || !value.trim()) {
@@ -132,8 +131,6 @@ jobs:
                 throw new Error(`Unable to parse ${label} as JSON. ${error.message}`);
               }
             };
-
-            const extraTemplateVars = safeParseJson('template-variables', templateVarsInput);
 
             const archiveBranchSegment = headRef.replace(/[^0-9A-Za-z]/g, '-');
             const repoArchiveRoot = `${repoName}-${archiveBranchSegment}`;
@@ -261,17 +258,30 @@ jobs:
 
             const defaultDescriptionTemplate = joinWithNewline([
               '{{PLAYGROUND_BUTTON}}',
+              '',
+              '<details>',
+              '<summary>How to keep this button removed</summary>',
+              '',
+              'If you want to remove this preview button and keep it removed, replace the entire block between the HTML comment markers with your own placeholder text:',
+              '',
+              '```html',
+              '<!-- wp-playground-preview:start -->',
+              '<!-- Preview button hidden by PR author -->',
+              '<!-- wp-playground-preview:end -->',
+              '```',
+              '',
+              'Alternatively, you can remove the button completely by deleting the entire block including the markers. The workflow will not restore it if `restore-button-if-removed` is set to `false`.',
+              '',
+              '</details>',
             ]);
 
             const defaultCommentTemplate = joinWithNewline([
               '### WordPress Playground Preview',
               '',
+              'The changes in this pull request can previewed and tested using a WordPress Playground instance.',
+              '',
               '{{PLAYGROUND_BUTTON}}',
             ]);
-
-            //  Other available placeholders:
-            //  '- PR: #{{PR_NUMBER}} — {{PR_TITLE}}',
-            //  '- Branch: `{{PR_HEAD_REF}}`',
 
             const baseTemplateVars = {
               PR_NUMBER: String(prNumber),
@@ -300,8 +310,7 @@ jobs:
                 PLAYGROUND_BUTTON_IMAGE_URL: defaultButtonImageUrl,
                 PLAYGROUND_BUTTON_HTML: defaultButtonTemplate,
                 PLAYGROUND_BUTTON: substitute(defaultButtonTemplate, {})
-              },
-              extraTemplateVars
+              }
             );
 
             const resolvedButton = substitute(defaultButtonTemplate, templateVariables);
@@ -324,12 +333,30 @@ jobs:
               let nextBody;
 
               if (currentBody.includes(descriptionMarkerStart) && currentBody.includes(descriptionMarkerEnd)) {
+                // Markers exist - check if there's a user placeholder
                 const pattern = new RegExp(
-                  `${descriptionMarkerStart}[\\s\\S]*?${descriptionMarkerEnd}`,
+                  `${descriptionMarkerStart}([\\s\\S]*?)${descriptionMarkerEnd}`,
                   'm'
                 );
+                const match = currentBody.match(pattern);
+                if (match) {
+                  const existingContent = match[1].trim();
+                  // If content exists but doesn't contain typical button HTML, assume it's a user placeholder
+                  const looksLikeButton = existingContent.includes('<a ') && existingContent.includes('playground');
+                  if (existingContent && !looksLikeButton) {
+                    core.info('User placeholder detected between markers. Skipping update to respect user preference.');
+                    return;
+                  }
+                }
+                // Update existing button
                 nextBody = currentBody.replace(pattern, managedBlock);
               } else {
+                // Markers don't exist - check if we should restore
+                if (!restoreButtonIfRemoved) {
+                  core.info('Button markers not found and restore-button-if-removed is false. Skipping to respect user removal.');
+                  return;
+                }
+                // Add the button
                 const trimmed = currentBody.trimEnd();
                 nextBody = trimmed ? `${trimmed}${String.fromCodePoint(10)}${String.fromCodePoint(10)}${managedBlock}` : managedBlock;
               }
