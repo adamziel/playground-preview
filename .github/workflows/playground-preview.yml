@@ -137,7 +137,6 @@ jobs:
 
             const archiveBranchSegment = headRef.replace(/[^0-9A-Za-z]/g, '-');
             const repoArchiveRoot = `${repoName}-${archiveBranchSegment}`;
-            const repoZipUrl = `https://codeload.github.com/${repoFullName}/zip/refs/heads/${encodeURIComponent(headRef)}`;
             const repoGitUrl = `https://github.com/${repoFullName}.git`;
 
             const normalizePath = (path) => {
@@ -169,10 +168,6 @@ jobs:
               const steps = [];
 
               if (pluginPath) {
-                const normalizedPluginPath = normalizePath(pluginPath);
-                const pluginSource = normalizedPluginPath
-                  ? `${repoArchiveRoot}/${normalizedPluginPath}`
-                  : `${repoArchiveRoot}`;
                 steps.push(
                   {
                     step: 'installPlugin',
@@ -180,7 +175,7 @@ jobs:
                       resource: 'git:directory',
                       url: repoGitUrl,
                       ref: headRef,
-                      path: normalizedPluginPath || "/"
+                      path: normalizePath(pluginPath) || "/"
                     },
                     options: {
                       activate: true
@@ -190,10 +185,6 @@ jobs:
               }
 
               if (themePath) {
-                const normalizedThemePath = normalizePath(themePath);
-                const themeSource = normalizedThemePath
-                  ? `${repoArchiveRoot}/${normalizedThemePath}`
-                  : `${repoArchiveRoot}`;
                 steps.push(
                   {
                     step: 'installTheme',
@@ -201,7 +192,7 @@ jobs:
                       resource: 'git:directory',
                       url: repoGitUrl,
                       ref: headRef,
-                      path: normalizedThemePath
+                      path: normalizePath(themePath) || "/"
                     },
                     options: {
                       activate: true
@@ -291,7 +282,6 @@ jobs:
               REPO_OWNER: owner,
               REPO_NAME: repoName,
               REPO_FULL_NAME: repoFullName,
-              REPO_ARCHIVE_URL: repoZipUrl,
               REPO_ARCHIVE_ROOT: repoArchiveRoot,
               REPO_SLUG: repoSlug,
               PLUGIN_PATH: pluginPath,
