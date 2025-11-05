@@ -146,6 +146,7 @@ jobs:
             const archiveBranchSegment = headRef.replace(/[^0-9A-Za-z]/g, '-');
             const repoArchiveRoot = `${repoName}-${archiveBranchSegment}`;
             const repoZipUrl = `https://codeload.github.com/${repoFullName}/zip/refs/heads/${encodeURIComponent(headRef)}`;
+            const repoGitUrl = `https://github.com/${repoFullName}.git`;
 
             const normalizePath = (path) => {
               const raw = (path || '').trim();
@@ -185,7 +186,7 @@ jobs:
                     step: 'installPlugin',
                     pluginData: {
                       resource: 'git:directory',
-                      url: repoZipUrl,
+                      url: repoGitUrl,
                       ref: headRef,
                       path: normalizedPluginPath
                     },
@@ -206,7 +207,7 @@ jobs:
                     step: 'installTheme',
                     themeData: {
                       resource: 'git:directory',
-                      url: repoZipUrl,
+                      url: repoGitUrl,
                       ref: headRef,
                       path: normalizedThemePath
                     },
