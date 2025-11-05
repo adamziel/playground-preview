@@ -204,11 +204,6 @@ on:
           Default template:
             ```
             {{PLAYGROUND_BUTTON}}
-
-            <details>
-            <summary>How to keep this button removed</summary>
-            [Instructions for removing the button...]
-            </details>
             ```
 
           Example (custom template with additional context):
@@ -552,21 +547,6 @@ jobs:
 
             const defaultDescriptionTemplate = joinWithNewline([
               '{{PLAYGROUND_BUTTON}}',
-              '',
-              '<details>',
-              '<summary>How to keep this button removed</summary>',
-              '',
-              'If you want to remove this preview button and keep it removed, replace the entire block between the HTML comment markers with your own placeholder text:',
-              '',
-              '```html',
-              '<!-- wp-playground-preview:start -->',
-              '<!-- Preview button hidden by PR author -->',
-              '<!-- wp-playground-preview:end -->',
-              '```',
-              '',
-              'Alternatively, you can remove the button completely by deleting the entire block including the markers. The workflow will not restore it if `restore-button-if-removed` is set to `false`.',
-              '',
-              '</details>',
             ]);
 
             const defaultCommentTemplate = joinWithNewline([
