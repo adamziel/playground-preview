@@ -188,7 +188,7 @@ jobs:
                       resource: 'git:directory',
                       url: repoGitUrl,
                       ref: headRef,
-                      path: normalizedPluginPath
+                      path: normalizedPluginPath || "/"
                     },
                     options: {
                       activate: true
