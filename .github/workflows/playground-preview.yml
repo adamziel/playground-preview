@@ -16,7 +16,7 @@ on:
       blueprint:
         type: string
         description: >
-          Inline JSON blueprint template. Supports {{PLACEHOLDER}} variables (see docs). Overrides auto-generated blueprint.
+          Inline JSON blueprint (ready-made, not a template). Overrides auto-generated blueprint.
       plugin-path:
         type: string
         description: >
@@ -25,11 +25,6 @@ on:
         type: string
         description: >
           Path to a theme inside the repository to install & activate in Playground (relative to repo root).
-      blueprint-variables:
-        type: string
-        description: >
-          Additional JSON object with values to interpolate into the blueprint template.
-        default: "{}"
       template-variables:
         type: string
         description: >
@@ -85,7 +80,6 @@ jobs:
           INPUT_BLUEPRINT: ${{ inputs.blueprint }}
           INPUT_PLUGIN_PATH: ${{ inputs.plugin-path }}
           INPUT_THEME_PATH: ${{ inputs.theme-path }}
-          INPUT_BLUEPRINT_VARIABLES: ${{ inputs.blueprint-variables }}
           INPUT_TEMPLATE_VARIABLES: ${{ inputs.template-variables }}
           INPUT_DESCRIPTION_TEMPLATE: ${{ inputs.description-template }}
           INPUT_COMMENT_TEMPLATE: ${{ inputs.comment-template }}
@@ -119,9 +113,8 @@ jobs:
 
             const pluginPath = (process.env.INPUT_PLUGIN_PATH || '').trim();
             const themePath = (process.env.INPUT_THEME_PATH || '').trim();
-            
-            const blueprintTemplateInput = process.env.INPUT_BLUEPRINT || '';
-            const blueprintVarsInput = process.env.INPUT_BLUEPRINT_VARIABLES || '{}';
+
+            const blueprintInput = process.env.INPUT_BLUEPRINT || '';
             const templateVarsInput = process.env.INPUT_TEMPLATE_VARIABLES || '{}';
             const descriptionTemplateInput = process.env.INPUT_DESCRIPTION_TEMPLATE || '';
             const commentTemplateInput = process.env.INPUT_COMMENT_TEMPLATE || '';
@@ -140,7 +133,6 @@ jobs:
               }
             };
 
-            const extraBlueprintVars = safeParseJson('blueprint-variables', blueprintVarsInput);
             const extraTemplateVars = safeParseJson('template-variables', templateVarsInput);
 
             const archiveBranchSegment = headRef.replace(/[^0-9A-Za-z]/g, '-');
@@ -230,28 +222,16 @@ jobs:
               );
             };
 
-            const rawBlueprintTemplate = blueprintTemplateInput && blueprintTemplateInput.trim().length
-              ? blueprintTemplateInput
+            const blueprintJson = blueprintInput && blueprintInput.trim().length
+              ? blueprintInput.trim()
               : buildAutoBlueprint();
 
-            const baseBlueprintVars = {
-              PR_NUMBER: String(prNumber),
-              PR_TITLE: prTitle,
-              PR_HEAD_REF: headRef,
-              PR_HEAD_SHA: headSha,
-              PR_BASE_REF: baseRef,
-              REPO_OWNER: owner,
-              REPO_NAME: repoName,
-              REPO_FULL_NAME: repoFullName,
-              REPO_ARCHIVE_URL: repoZipUrl,
-              REPO_ARCHIVE_ROOT: repoArchiveRoot,
-              REPO_SLUG: repoSlug,
-              PLUGIN_PATH: pluginPath,
-              THEME_PATH: themePath,
-              PLUGIN_SLUG: pluginSlug,
-              THEME_SLUG: themeSlug,
-              PLAYGROUND_HOST: playgroundHost
-            };
+            try {
+              JSON.parse(blueprintJson);
+            } catch (error) {
+              core.warning(blueprintJson);
+              throw new Error(`Blueprint is not valid JSON. ${error.message}`);
+            }
 
             const mergeVariables = (...maps) => maps.reduce((acc, map) => {
               Object.entries(map || {}).forEach(([key, value]) => {
@@ -262,8 +242,6 @@ jobs:
               });
               return acc;
             }, {});
-
-            const blueprintVariables = mergeVariables(baseBlueprintVars, extraBlueprintVars);
 
             const substitute = (template, values) => {
               if (!template) {
@@ -277,16 +255,7 @@ jobs:
               });
             };
 
-            const substitutedBlueprint = substitute(rawBlueprintTemplate, blueprintVariables);
-
-            try {
-              JSON.parse(substitutedBlueprint);
-            } catch (error) {
-              core.warning(substitutedBlueprint);
-              throw new Error(`Resulting blueprint is not valid JSON. ${error.message}`);
-            }
-
-            const blueprintDataUrl = `data:application/json,${encodeURIComponent(substitutedBlueprint)}`;
+            const blueprintDataUrl = `data:application/json,${encodeURIComponent(blueprintJson)}`;
 
             const previewUrl = `${playgroundHost}${playgroundHost.includes('?') ? '&' : '?'}blueprint-url=${blueprintDataUrl}`;
 
@@ -313,11 +282,30 @@ jobs:
             //  '- PR: #{{PR_NUMBER}} — {{PR_TITLE}}',
             //  '- Branch: `{{PR_HEAD_REF}}`',
 
+            const baseTemplateVars = {
+              PR_NUMBER: String(prNumber),
+              PR_TITLE: prTitle,
+              PR_HEAD_REF: headRef,
+              PR_HEAD_SHA: headSha,
+              PR_BASE_REF: baseRef,
+              REPO_OWNER: owner,
+              REPO_NAME: repoName,
+              REPO_FULL_NAME: repoFullName,
+              REPO_ARCHIVE_URL: repoZipUrl,
+              REPO_ARCHIVE_ROOT: repoArchiveRoot,
+              REPO_SLUG: repoSlug,
+              PLUGIN_PATH: pluginPath,
+              THEME_PATH: themePath,
+              PLUGIN_SLUG: pluginSlug,
+              THEME_SLUG: themeSlug,
+              PLAYGROUND_HOST: playgroundHost
+            };
+
             const templateVariables = mergeVariables(
-              baseBlueprintVars,
+              baseTemplateVars,
               {
                 PLAYGROUND_URL: previewUrl,
-                PLAYGROUND_BLUEPRINT_JSON: substitutedBlueprint,
+                PLAYGROUND_BLUEPRINT_JSON: blueprintJson,
                 PLAYGROUND_BLUEPRINT_DATA_URL: blueprintDataUrl,
                 PLAYGROUND_BUTTON_IMAGE_URL: defaultButtonImageUrl,
                 PLAYGROUND_BUTTON_HTML: defaultButtonTemplate,
@@ -440,7 +428,7 @@ jobs:
 
             core.setOutput('mode', mode);
             core.setOutput('preview-url', previewUrl);
-            core.setOutput('blueprint-json', substitutedBlueprint);
+            core.setOutput('blueprint-json', blueprintJson);
             core.setOutput('rendered-description', renderedDescription);
             core.setOutput('rendered-comment', renderedComment);
             core.setOutput('comment-id', commentId);
