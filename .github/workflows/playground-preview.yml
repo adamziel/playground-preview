@@ -8,7 +8,7 @@ on:
         description: >
           How to publish the preview button. Accepted values: description (default) or comment.
           Description mode updates the PR body, comment mode manages a PR comment.
-        default: description
+        default: comment
       playground-host:
         type: string
         description: Base Playground host URL used to build the preview link.
