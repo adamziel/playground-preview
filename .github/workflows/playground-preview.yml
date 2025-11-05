@@ -25,10 +25,6 @@ on:
         type: string
         description: >
           Path to a theme inside the repository to install & activate in Playground (relative to repo root).
-      wp-content-path:
-        type: string
-        description: >
-          Path to a wp-content directory inside the repository to import into Playground (relative to repo root).
       blueprint-variables:
         type: string
         description: >
@@ -89,7 +85,6 @@ jobs:
           INPUT_BLUEPRINT: ${{ inputs.blueprint }}
           INPUT_PLUGIN_PATH: ${{ inputs.plugin-path }}
           INPUT_THEME_PATH: ${{ inputs.theme-path }}
-          INPUT_WP_CONTENT_PATH: ${{ inputs.wp-content-path }}
           INPUT_BLUEPRINT_VARIABLES: ${{ inputs.blueprint-variables }}
           INPUT_TEMPLATE_VARIABLES: ${{ inputs.template-variables }}
           INPUT_DESCRIPTION_TEMPLATE: ${{ inputs.description-template }}
@@ -124,8 +119,7 @@ jobs:
 
             const pluginPath = (process.env.INPUT_PLUGIN_PATH || '').trim();
             const themePath = (process.env.INPUT_THEME_PATH || '').trim();
-            const wpContentPath = (process.env.INPUT_WP_CONTENT_PATH || '').trim();
-
+            
             const blueprintTemplateInput = process.env.INPUT_BLUEPRINT || '';
             const blueprintVarsInput = process.env.INPUT_BLUEPRINT_VARIABLES || '{}';
             const templateVarsInput = process.env.INPUT_TEMPLATE_VARIABLES || '{}';
@@ -181,15 +175,6 @@ jobs:
             const buildAutoBlueprint = () => {
               const steps = [];
 
-              const needsArchive = Boolean(pluginPath || themePath || wpContentPath);
-              if (needsArchive) {
-                steps.push({
-                  step: 'importRemoteZip',
-                  url: repoZipUrl,
-                  path: '/tmp/repository.zip'
-                });
-              }
-
               if (pluginPath) {
                 const normalizedPluginPath = normalizePath(pluginPath);
                 const pluginSource = normalizedPluginPath
@@ -197,14 +182,16 @@ jobs:
                   : `${repoArchiveRoot}`;
                 steps.push(
                   {
-                    step: 'copyFromZip',
-                    zipFile: '/tmp/repository.zip',
-                    source: pluginSource,
-                    destination: `/wp-content/plugins/${pluginSlug}`
-                  },
-                  {
-                    step: 'wp-cli',
-                    command: `plugin activate ${pluginSlug}`
+                    step: 'installPlugin',
+                    pluginData: {
+                      resource: 'git:directory',
+                      url: repoZipUrl,
+                      ref: headRef,
+                      path: normalizedPluginPath
+                    },
+                    options: {
+                      activate: true
+                    }
                   }
                 );
               }
@@ -216,36 +203,18 @@ jobs:
                   : `${repoArchiveRoot}`;
                 steps.push(
                   {
-                    step: 'copyFromZip',
-                    zipFile: '/tmp/repository.zip',
-                    source: themeSource,
-                    destination: `/wp-content/themes/${themeSlug}`
-                  },
-                  {
-                    step: 'wp-cli',
-                    command: `theme activate ${themeSlug}`
+                    step: 'installTheme',
+                    themeData: {
+                      resource: 'git:directory',
+                      url: repoZipUrl,
+                      ref: headRef,
+                      path: normalizedThemePath
+                    },
+                    options: {
+                      activate: true
+                    }
                   }
                 );
-              }
-
-              if (wpContentPath) {
-                const normalizedWpContentPath = normalizePath(wpContentPath);
-                const wpContentSource = normalizedWpContentPath
-                  ? `${repoArchiveRoot}/${normalizedWpContentPath}`
-                  : `${repoArchiveRoot}`;
-                steps.push({
-                  step: 'copyFromZip',
-                  zipFile: '/tmp/repository.zip',
-                  source: wpContentSource,
-                  destination: '/wp-content'
-                });
-              }
-
-              if (!steps.length) {
-                steps.push({
-                  step: 'wp-cli',
-                  command: 'plugin list'
-                });
               }
 
               return JSON.stringify(
@@ -280,7 +249,6 @@ jobs:
               REPO_SLUG: repoSlug,
               PLUGIN_PATH: pluginPath,
               THEME_PATH: themePath,
-              WP_CONTENT_PATH: wpContentPath,
               PLUGIN_SLUG: pluginSlug,
               THEME_SLUG: themeSlug,
               PLAYGROUND_HOST: playgroundHost
