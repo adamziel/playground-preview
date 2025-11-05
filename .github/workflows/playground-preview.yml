@@ -334,20 +334,17 @@ jobs:
 
             const defaultDescriptionTemplate = joinWithNewline([
               '{{PLAYGROUND_BUTTON}}',
-              '',
-              '<sub>Preview generated for PR #{{PR_NUMBER}} ({{PR_HEAD_REF}})</sub>'
             ]);
 
             const defaultCommentTemplate = joinWithNewline([
               '### WordPress Playground Preview',
               '',
               '{{PLAYGROUND_BUTTON}}',
-              '',
-              '- PR: #{{PR_NUMBER}} — {{PR_TITLE}}',
-              '- Branch: `{{PR_HEAD_REF}}`',
-              '',
-              '_This preview stays in sync with the pull request._'
             ]);
+
+            //  Other available placeholders:
+            //  '- PR: #{{PR_NUMBER}} — {{PR_TITLE}}',
+            //  '- Branch: `{{PR_HEAD_REF}}`',
 
             const templateVariables = mergeVariables(
               baseBlueprintVars,
