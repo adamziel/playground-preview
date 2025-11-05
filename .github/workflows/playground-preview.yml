@@ -310,7 +310,7 @@ jobs:
             const previewUrl = `${playgroundHost}${playgroundHost.includes('?') ? '&' : '?'}blueprint-url=${blueprintDataUrl}`;
 
             const joinWithNewline = (segments) => segments.join('\n');
-            const defaultButtonImageUrl = 'https://raw.githubusercontent.com/Automattic/preview-button/main/assets/playground-preview-button.svg';
+            const defaultButtonImageUrl = 'https://raw.githubusercontent.com/adamziel/playground-preview/refs/heads/trunk/assets/playground-preview-button.svg';
 
             const defaultButtonTemplate = joinWithNewline([
               '<a href="{{PLAYGROUND_URL}}" target="_blank" rel="noopener noreferrer">',
