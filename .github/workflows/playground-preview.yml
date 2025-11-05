@@ -226,9 +226,7 @@ jobs:
                     wp: 'latest'
                   },
                   steps
-                },
-                null,
-                2
+                }
               );
             };
 
