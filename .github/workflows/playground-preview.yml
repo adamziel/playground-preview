@@ -1,4 +1,135 @@
 name: WordPress Playground Preview
+description: |
+  # WordPress Playground Preview Button
+
+  Automatically adds an interactive preview button to your pull requests, allowing reviewers and contributors
+  to test WordPress plugins and themes directly in their browser using WordPress Playground—no local setup required.
+
+  ## What This Does
+
+  When a pull request is opened or updated, this workflow:
+  1. Generates a WordPress Blueprint configuration that points to your PR branch
+  2. Creates a one-click preview URL that launches a fully functional WordPress instance
+  3. Installs and activates your plugin or theme from the PR branch
+  4. Adds a preview button to the PR (either in the description or as a comment)
+
+  Reviewers can click the button and instantly test your changes in an isolated WordPress environment
+  that runs entirely in their browser—no servers, no containers, no configuration needed.
+
+  ## Quick Start
+
+  ### For Plugins
+
+  Create `.github/workflows/pr-preview.yml` in your repository:
+
+  ```yaml
+  name: PR Preview
+  on:
+    pull_request:
+      types: [opened, synchronize, reopened, edited]
+
+  jobs:
+    preview:
+      permissions:
+        contents: read
+        pull-requests: write
+      uses: WordPress/wordpress-playground/.github/workflows/playground-preview-button.yml@trunk
+      with:
+        plugin-path: .  # Use "." if plugin is in repository root
+  ```
+
+  That's it! On your next PR, a preview button will automatically appear.
+
+  ### For Themes
+
+  ```yaml
+  uses: WordPress/wordpress-playground/.github/workflows/playground-preview-button.yml@trunk
+  with:
+    theme-path: .  # Path to your theme directory
+  ```
+
+  ### For Both Plugin + Theme
+
+  ```yaml
+  uses: WordPress/wordpress-playground/.github/workflows/playground-preview-button.yml@trunk
+  with:
+    plugin-path: plugins/my-plugin
+    theme-path: themes/my-theme
+  ```
+
+  ## Common Scenarios
+
+  ### Scenario 1: Plugin in a subdirectory
+  If your plugin lives in `plugins/my-awesome-plugin/`:
+  ```yaml
+  with:
+    plugin-path: plugins/my-awesome-plugin
+  ```
+
+  ### Scenario 2: Post as comment instead of updating description
+  ```yaml
+  with:
+    plugin-path: .
+    mode: post-comment
+  ```
+
+  ### Scenario 3: Custom WordPress/PHP versions
+  For advanced configuration, provide a custom blueprint:
+  ```yaml
+  with:
+    blueprint: |
+      {
+        "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+        "preferredVersions": {
+          "php": "8.3",
+          "wp": "6.4"
+        },
+        "steps": [
+          {
+            "step": "installPlugin",
+            "pluginData": {
+              "resource": "git:directory",
+              "url": "https://github.com/${{ github.repository }}.git",
+              "ref": "${{ github.head_ref }}",
+              "path": "."
+            },
+            "options": { "activate": true }
+          }
+        ]
+      }
+  ```
+
+  ### Scenario 4: Respect when PR authors remove the button
+  ```yaml
+  with:
+    plugin-path: .
+    restore-button-if-removed: false
+  ```
+
+  ## How Reviewers Use It
+
+  1. Open any pull request with the preview button
+  2. Click "Open WordPress Playground Preview"
+  3. Wait 10-30 seconds while WordPress loads in the browser
+  4. Your plugin/theme is pre-installed and activated
+  5. Test the changes, verify functionality, leave feedback
+
+  ## Learn More
+
+  - **WordPress Playground**: https://wordpress.github.io/wordpress-playground/
+  - **Blueprint Documentation**: https://wordpress.github.io/wordpress-playground/blueprints/
+  - **Try it now**: https://playground.wordpress.net/
+
+  ## Requirements
+
+  - Repository must be public (or Playground must have access to private repos)
+  - Workflow must run on `pull_request` events
+  - Requires permissions: `pull-requests: write`, `contents: read`
+
+  ---
+
+  For complete documentation of all inputs and advanced configuration options, see the detailed
+  parameter descriptions below.
 
 on:
   workflow_call:
@@ -717,7 +848,7 @@ jobs:
             };
 
             let commentId = '';
-            if (mode === 'description') {
+            if (mode === 'append-to-description') {
               await performDescriptionUpdate();
             } else {
               await removeManagedDescriptionBlock();
