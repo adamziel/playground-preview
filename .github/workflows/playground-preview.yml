@@ -181,7 +181,6 @@ on:
 
           Available template variables:
             • {{PLAYGROUND_BUTTON}} - Rendered preview button HTML (recommended to include)
-            • {{PLAYGROUND_BUTTON_HTML}} - Same as PLAYGROUND_BUTTON
             • {{PLAYGROUND_URL}} - Full URL to the Playground preview
             • {{PLAYGROUND_BUTTON_IMAGE_URL}} - URL to the button image
             • {{PLAYGROUND_BLUEPRINT_JSON}} - Complete blueprint JSON string
@@ -227,7 +226,6 @@ on:
 
           Available template variables:
             • {{PLAYGROUND_BUTTON}} - Rendered preview button HTML (recommended to include)
-            • {{PLAYGROUND_BUTTON_HTML}} - Same as PLAYGROUND_BUTTON
             • {{PLAYGROUND_URL}} - Full URL to the Playground preview
             • {{PLAYGROUND_BUTTON_IMAGE_URL}} - URL to the button image
             • {{PLAYGROUND_BLUEPRINT_JSON}} - Complete blueprint JSON string
@@ -532,12 +530,14 @@ jobs:
                   
                 // Escape HTML entities somewhat naively to prevent the values leaking
                 // into HTML syntax elements.
-                value = value
-                  .replace(/&/g, '&amp;')
-                  .replace(/</g, '&lt;')
-                  .replace(/>/g, '&gt;')
-                  .replace(/"/g, '&quot;')
-                  .replace(/'/g, '&#039;');
+                if(key !== 'PLAYGROUND_BUTTON') {
+                  value = value
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+                }
                 return value;
               });
             };
@@ -592,14 +592,11 @@ jobs:
                 PLAYGROUND_BLUEPRINT_JSON: blueprintJson,
                 PLAYGROUND_BLUEPRINT_DATA_URL: blueprintDataUrl,
                 PLAYGROUND_BUTTON_IMAGE_URL: defaultButtonImageUrl,
-                PLAYGROUND_BUTTON_HTML: defaultButtonTemplate,
                 PLAYGROUND_BUTTON: substitute(defaultButtonTemplate, {})
               }
             );
 
-            const resolvedButton = substitute(defaultButtonTemplate, templateVariables);
-            templateVariables.PLAYGROUND_BUTTON = resolvedButton;
-            templateVariables.PLAYGROUND_BUTTON_HTML = resolvedButton;
+            templateVariables.PLAYGROUND_BUTTON = substitute(defaultButtonTemplate, templateVariables);
 
             const descriptionTemplate = descriptionTemplateInput && descriptionTemplateInput.trim().length
               ? descriptionTemplateInput
